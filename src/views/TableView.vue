@@ -4,7 +4,7 @@ import { ElMessage, ElCard, ElTable, ElTableColumn, ElButton, ElPagination, ElSe
 import { useExcelData } from '../composables/useExcelData'
 import CommentDialog, { type UserInfo, type CommentItem } from '../components/CommentDialog.vue'
 
-const { dataRaw, totalCount, loading, loadData } = useExcelData()
+const { dataRaw, totalCount, loadData } = useExcelData()
 
 const tableLoading = ref(true)
 const pageSize = ref(50)
@@ -96,7 +96,7 @@ const dialogUser = ref<UserInfo | null>(null)
 const dialogComments = ref<CommentItem[]>([])
 const dialogRef = ref<InstanceType<typeof CommentDialog>>()
 
-function showDetail(row: any[], rank: number) {
+function showDetail(row: any, rank: number) {
   if (dialogRef.value) {
     dialogUser.value = dialogRef.value.rowToUser(row, rank)
     dialogComments.value = dialogRef.value.parseRow(row)
@@ -219,7 +219,7 @@ onMounted(async () => {
       height="calc(100vh - 260px)"
     >
       <el-table-column label="排名" width="70" align="center">
-        <template #default="{ row, $index }">
+        <template #default="{ $index }">
           <span style="font-weight: bold; color: #409eff;">#{{ (currentPage - 1) * pageSize + $index + 1 }}</span>
         </template>
       </el-table-column>

@@ -6,7 +6,7 @@ import { ElMessage, ElCard, ElSelect, ElOption, ElSkeleton } from 'element-plus'
 import { useExcelData } from '../composables/useExcelData'
 import CommentDialog, { type UserInfo, type CommentItem } from '../components/CommentDialog.vue'
 
-const { dataRaw, totalCount, loading, dataVersion, loadData } = useExcelData()
+const { dataRaw, totalCount, dataVersion, loadData } = useExcelData()
 
 const chartLoading = ref(true)
 const chartOptions = ref({})

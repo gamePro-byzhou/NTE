@@ -10,7 +10,6 @@ const { loadFromFile, EXPECTED_HEADERS, sourceName } = useExcelData()
 
 const fileInput = ref<HTMLInputElement>()
 const formatErrorVisible = ref(false)
-let pendingFile: File | null = null
 
 function onMenuClick(index: string) {
   router.push(index)
@@ -41,7 +40,6 @@ async function onFileSelected(e: Event) {
     window.dispatchEvent(new CustomEvent('excel-data-changed'))
   } else {
     if (result.error === '格式不匹配') {
-      pendingFile = file
       formatErrorVisible.value = true
     } else {
       ElMessage.error(result.error || '文件解析失败')
