@@ -34,7 +34,7 @@ export function useExcelData() {
     loading.value = true
     loadPromise = (async () => {
       try {
-        const resp = await fetch('/data.xlsx')
+        const resp = await fetch(`${import.meta.env.BASE_URL}data.xlsx`)
         const blob = await resp.arrayBuffer()
         const workbook = XLSX.read(blob, { type: 'array' })
         const sheetName = workbook.SheetNames[0]
