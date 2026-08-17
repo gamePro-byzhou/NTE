@@ -2,32 +2,31 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main] # 主分支名，如 master 或 main
-  workflow_dispatch: # 支持在 Actions 页面手动触发部署
+    branches: [main]
+  workflow_dispatch:
 
-# 赋予 GITHUB_TOKEN 写权限，供 actions-gh-pages 推送 gh-pages 分支
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
-# 同一时间只允许一个部署任务，新的推送会取消进行中的部署
 concurrency:
   group: github-pages
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # 安装 pnpm（自动读取 package.json 中的 packageManager 字段锁定版本）
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22 # vite 8 要求 Node ^20.19.0 或 >=22.12.0
+          node-version: 22
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -36,8 +35,17 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist # 构建输出目录
+          path: ./dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    ne
