@@ -2,7 +2,17 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [master] # 根据你的主分支名调整，如 master
+    branches: [master] # 主分支名，如 master 或 main
+  workflow_dispatch: # 支持在 Actions 页面手动触发部署
+
+# 赋予 GITHUB_TOKEN 写权限，供 actions-gh-pages 推送 gh-pages 分支
+permissions:
+  contents: write
+
+# 同一时间只允许一个部署任务，新的推送会取消进行中的部署
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -10,20 +20,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 👇 关键：安装 pnpm
+      # 安装 pnpm（自动读取 package.json 中的 packageManager 字段锁定版本）
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10.11.0
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18.19.0'
+          node-version: 22 # vite 8 要求 Node ^20.19.0 或 >=22.12.0
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm build
@@ -31,5 +39,5 @@ jobs:
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
-          github_token: ${{ secrets.NTE_pro }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist # 构建输出目录
