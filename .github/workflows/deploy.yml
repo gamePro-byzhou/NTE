@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [dev] # 根据你的主分支名调整，如 master
+    branches: [master] # 根据你的主分支名调整，如 master
 
 jobs:
   deploy:
