@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [master] # 主分支名，如 master 或 main
+    branches: [main] # 主分支名，如 master 或 main
   workflow_dispatch: # 支持在 Actions 页面手动触发部署
 
 # 赋予 GITHUB_TOKEN 写权限，供 actions-gh-pages 推送 gh-pages 分支
