@@ -1,16 +1,25 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import * as echarts from 'echarts'
 import VChart from 'vue-echarts'
 import { ElMessage, ElCard, ElSelect, ElOption, ElSkeleton } from 'element-plus'
 import { useExcelData } from '../composables/useExcelData'
 import CommentDialog, { type UserInfo, type CommentItem } from '../components/CommentDialog.vue'
 
-const { dataRaw, totalCount, dataVersion, loadData } = useExcelData()
+const { dataRaw, totalCount, dataVersion, loadData, standardHeaderName, hasDupColumn } = useExcelData()
 
 const chartLoading = ref(true)
 const chartOptions = ref({})
 const topN = ref(50)
+
+// 实际表头名（用于图例/坐标轴名称，识别不到时回退到标准名）
+const commentName = computed(() => standardHeaderName('评论数') || '评论数')
+const dupName = computed(() => standardHeaderName('完全重复文案数') || '完全重复文案数')
+
+// 是否存在可绘制的数据（评论数列为必需列，存在即可能绘制）
+const hasChartData = computed(() =>
+  dataRaw.value.length > 0 && dataRaw.value.some((r: any) => Number(r['评论数']) > 0)
+)
 
 // 弹窗状态
 const dialogVisible = ref(false)
@@ -22,9 +31,58 @@ const dialogRef = ref<InstanceType<typeof CommentDialog>>()
 function updateChart() {
   const rows = dataRaw.value.slice(0, topN.value)
   const ranks = rows.map((_: any, i: number) => i + 1)
-  const comments = rows.map((r: any) => r[3] || 0)
-  const duplicates = rows.map((r: any) => r[4] || 0)
-  const nicknames = rows.map((r: any) => r[2] || '')
+  const comments = rows.map((r: any) => Number(r['评论数']) || 0)
+  const nicknames = rows.map((r: any) => r['昵称'] || '')
+  // 有重复文案列时才绘制重复文案曲线
+  const hasDup = hasDupColumn()
+  const duplicates = hasDup ? rows.map((r: any) => Number(r['完全重复文案数']) || 0) : []
+
+  const yAxis: any[] = [
+    {
+      type: 'value', name: commentName.value,
+      nameTextStyle: { fontSize: 13, fontWeight: 'bold' },
+      splitLine: { lineStyle: { type: 'dashed', color: '#e8e8e8' } }
+    }
+  ]
+  if (hasDup) {
+    yAxis.push({
+      type: 'value', name: dupName.value,
+      nameTextStyle: { fontSize: 13, fontWeight: 'bold' },
+      splitLine: { show: false }
+    })
+  }
+
+  const series: any[] = [
+    {
+      name: commentName.value, type: 'line',
+      data: comments, smooth: true,
+      symbol: 'circle', symbolSize: 6,
+      lineStyle: { width: 2.5, color: '#409eff' },
+      itemStyle: { color: '#409eff' },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(64,158,255,0.3)' },
+          { offset: 1, color: 'rgba(64,158,255,0.02)' }
+        ])
+      }
+    }
+  ]
+  if (hasDup) {
+    series.push({
+      name: dupName.value, type: 'line',
+      yAxisIndex: 1,
+      data: duplicates, smooth: true,
+      symbol: 'diamond', symbolSize: 6,
+      lineStyle: { width: 2.5, color: '#e6a23c' },
+      itemStyle: { color: '#e6a23c' },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(230,162,60,0.25)' },
+          { offset: 1, color: 'rgba(230,162,60,0.02)' }
+        ])
+      }
+    })
+  }
 
   chartOptions.value = {
     tooltip: {
@@ -48,7 +106,7 @@ function updateChart() {
       }
     },
     legend: {
-      data: ['评论数', '完全重复文案数'],
+      data: hasDup ? [commentName.value, dupName.value] : [commentName.value],
       top: 10,
       textStyle: { fontSize: 14 }
     },
@@ -60,18 +118,7 @@ function updateChart() {
       nameTextStyle: { fontSize: 13, fontWeight: 'bold' },
       axisLabel: { interval: Math.max(0, Math.floor(topN.value / 20)), fontSize: 11 }
     },
-    yAxis: [
-      {
-        type: 'value', name: '评论数',
-        nameTextStyle: { fontSize: 13, fontWeight: 'bold' },
-        splitLine: { lineStyle: { type: 'dashed', color: '#e8e8e8' } }
-      },
-      {
-        type: 'value', name: '重复文案数',
-        nameTextStyle: { fontSize: 13, fontWeight: 'bold' },
-        splitLine: { show: false }
-      }
-    ],
+    yAxis,
     dataZoom: [
       { type: 'inside', start: 0, end: 100 },
       {
@@ -83,35 +130,7 @@ function updateChart() {
         textStyle: { fontSize: 11 }
       }
     ],
-    series: [
-      {
-        name: '评论数', type: 'line',
-        data: comments, smooth: true,
-        symbol: 'circle', symbolSize: 6,
-        lineStyle: { width: 2.5, color: '#409eff' },
-        itemStyle: { color: '#409eff' },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(64,158,255,0.3)' },
-            { offset: 1, color: 'rgba(64,158,255,0.02)' }
-          ])
-        }
-      },
-      {
-        name: '完全重复文案数', type: 'line',
-        yAxisIndex: 1,
-        data: duplicates, smooth: true,
-        symbol: 'diamond', symbolSize: 6,
-        lineStyle: { width: 2.5, color: '#e6a23c' },
-        itemStyle: { color: '#e6a23c' },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(230,162,60,0.25)' },
-            { offset: 1, color: 'rgba(230,162,60,0.02)' }
-          ])
-        }
-      }
-    ]
+    series
   } as any
 
   chartLoading.value = false
@@ -181,11 +200,17 @@ onMounted(async () => {
       <template #default>
         <div style="height: 520px; width: 100%;">
           <VChart
-            v-if="!chartLoading"
+            v-if="!chartLoading && hasChartData"
             :option="chartOptions"
             autoresize
             style="height: 100%; width: 100%;"
             @click="onChartClick"
+          />
+          <el-empty
+            v-else-if="!chartLoading"
+            description="暂无可绘制的数据"
+            :image-size="120"
+            style="height: 100%; display: flex; flex-direction: column; justify-content: center;"
           />
         </div>
       </template>

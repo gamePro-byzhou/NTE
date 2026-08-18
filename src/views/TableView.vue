@@ -4,7 +4,7 @@ import { ElMessage, ElCard, ElTable, ElTableColumn, ElButton, ElPagination, ElSe
 import { useExcelData } from '../composables/useExcelData'
 import CommentDialog, { type UserInfo, type CommentItem } from '../components/CommentDialog.vue'
 
-const { dataRaw, totalCount, loadData } = useExcelData()
+const { dataRaw, totalCount, headers, loadData, hasDupColumn } = useExcelData()
 
 const tableLoading = ref(true)
 const pageSize = ref(50)
@@ -17,7 +17,7 @@ const filterType = ref<'all' | 'top100' | 'gt100' | 'gt10' | 'gt5'>('all')
 const nicknameSearch = ref('')
 const uidSearch = ref('')
 
-// 筛选后的数据
+// 筛选后的数据（行数据为对象，按标准字段名访问）
 const filteredData = computed(() => {
   let raw = dataRaw.value
 
@@ -27,26 +27,26 @@ const filteredData = computed(() => {
       raw = raw.slice(0, 100)
       break
     case 'gt100':
-      raw = raw.filter((r: any) => (r[3] || 0) > 100)
+      raw = raw.filter((r: any) => Number(r['评论数']) > 100)
       break
     case 'gt10':
-      raw = raw.filter((r: any) => (r[3] || 0) > 10)
+      raw = raw.filter((r: any) => Number(r['评论数']) > 10)
       break
     case 'gt5':
-      raw = raw.filter((r: any) => (r[3] || 0) > 5)
+      raw = raw.filter((r: any) => Number(r['评论数']) > 5)
       break
   }
 
   // 昵称模糊搜索
   const nick = nicknameSearch.value.trim()
   if (nick) {
-    raw = raw.filter((r: any) => String(r[2] || '').includes(nick))
+    raw = raw.filter((r: any) => String(r['昵称'] || '').includes(nick))
   }
 
   // UID搜索（支持模糊匹配）
   const uid = uidSearch.value.trim()
   if (uid) {
-    raw = raw.filter((r: any) => String(r[1] || '').includes(uid))
+    raw = raw.filter((r: any) => String(r['UID'] || '').includes(uid))
   }
 
   return raw
@@ -56,12 +56,25 @@ const filteredData = computed(() => {
 const stats = computed(() => {
   const data = filteredData.value
   const userCount = data.length
-  const totalComments = data.reduce((sum: number, r: any) => sum + (r[3] || 0), 0)
-  const totalDuplicates = data.reduce((sum: number, r: any) => sum + (r[4] || 0), 0)
+  const totalComments = data.reduce((sum: number, r: any) => sum + (Number(r['评论数']) || 0), 0)
+  const totalDuplicates = data.reduce((sum: number, r: any) => sum + (Number(r['完全重复文案数']) || 0), 0)
   const avgComments = userCount > 0 ? (totalComments / userCount).toFixed(1) : '0'
   const avgDupRate = totalComments > 0 ? ((totalDuplicates / totalComments) * 100).toFixed(1) : '0'
   return { userCount, totalComments, totalDuplicates, avgComments, avgDupRate }
 })
+
+// 表格动态列：按实际表头渲染（跳过排名列，已有 # 列展示）
+const tableHeaders = computed(() => headers.value.filter(h => !/^(排名|rank)$/i.test(h)))
+
+// 是否存在重复文案列（表头包含「重复文案」），有则展示重复率列
+const hasDupRate = computed(() => dataRaw.value.length > 0 && hasDupColumn())
+
+// 单元格格式化
+function formatCell(v: any) {
+  if (v === undefined || v === null || v === '') return '-'
+  if (typeof v === 'number') return v.toLocaleString()
+  return String(v)
+}
 
 // 筛选后的分页数据
 const pageData = computed(() => {
@@ -223,37 +236,24 @@ onMounted(async () => {
           <span style="font-weight: bold; color: #409eff;">#{{ (currentPage - 1) * pageSize + $index + 1 }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="UID" width="140" align="center">
+      <!-- 按实际表头动态渲染数据列 -->
+      <el-table-column
+        v-for="h in tableHeaders"
+        :key="h"
+        :label="h"
+        min-width="130"
+        show-overflow-tooltip
+      >
         <template #default="{ row }">
-          <span style="font-size: 12px; color: #909399;">{{ row[1] || '-' }}</span>
+          <span>{{ formatCell(row[h]) }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="2" label="昵称" min-width="140" show-overflow-tooltip />
-      <el-table-column label="评论数" width="100" align="center">
-        <template #default="{ row }">
-          <span style="font-weight: bold; color: #409eff;">{{ row[3] || 0 }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="完全重复文案" width="120" align="center">
-        <template #default="{ row }">
-          <span style="font-weight: bold; color: #e6a23c;">{{ row[4] || 0 }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="重复率" width="100" align="center">
+      <!-- 重复率列（识别到评论数与重复文案数列时显示） -->
+      <el-table-column v-if="hasDupRate" label="重复率" width="100" align="center">
         <template #default="{ row }">
           <span style="font-weight: bold; color: #f56c6c;">
-            {{ row[3] > 0 ? ((row[4] / row[3]) * 100).toFixed(1) : 0 }}%
+            {{ Number(row['评论数']) > 0 ? ((Number(row['完全重复文案数']) / Number(row['评论数'])) * 100).toFixed(1) : 0 }}%
           </span>
-        </template>
-      </el-table-column>
-      <el-table-column label="首次评论" width="150" align="center">
-        <template #default="{ row }">
-          <span style="font-size: 12px;">{{ row[5] || '-' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="最后评论" width="150" align="center">
-        <template #default="{ row }">
-          <span style="font-size: 12px;">{{ row[6] || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="110" align="center" fixed="right">

@@ -6,7 +6,7 @@ export interface UserInfo {
   nickname: string
   uid: string
   commentCount: number
-  duplicateCount: number
+  duplicateCount: number | null
   firstTime: string
   lastTime: string
 }
@@ -33,8 +33,9 @@ function onClose() {
   emit('update:visible', false)
 }
 
-function parseRow(row: any[]) {
-  const rawComments = row[7] || ''
+// 按标准字段名解析行数据（上传文件表头可能不同，字段缺失时容错）
+function parseRow(row: any) {
+  const rawComments = row['评论内容示例'] || row['评论内容'] || ''
   const comments = String(rawComments)
     .split(/⏎/)
     .map((c: string) => c.trim())
@@ -43,15 +44,17 @@ function parseRow(row: any[]) {
 }
 
 // 从行数据解析出 userInfo
-function rowToUser(row: any[], rank?: number): UserInfo {
+function rowToUser(row: any, rank?: number): UserInfo {
+  const dupRaw = row['完全重复文案数']
+  const hasDup = dupRaw !== undefined && dupRaw !== null && dupRaw !== ''
   return {
-    rank: rank ?? row[0],
-    nickname: row[2] || '未知',
-    uid: String(row[1] || '-'),
-    commentCount: row[3] || 0,
-    duplicateCount: row[4] || 0,
-    firstTime: row[5] || '-',
-    lastTime: row[6] || '-',
+    rank: rank ?? (Number(row['排名']) || 0),
+    nickname: row['昵称'] || '未知',
+    uid: String(row['UID'] ?? '-'),
+    commentCount: Number(row['评论数']) || 0,
+    duplicateCount: hasDup ? Number(dupRaw) : null,
+    firstTime: row['首次评论时间'] || '-',
+    lastTime: row['最后评论时间'] || '-',
   }
 }
 
@@ -89,12 +92,12 @@ defineExpose({ parseRow, rowToUser })
           </div>
           <div>
             <div style="font-size: 12px; color: #909399; margin-bottom: 2px;">重复文案数</div>
-            <div style="font-size: 15px; font-weight: bold; color: #e6a23c;">{{ user.duplicateCount }}</div>
+            <div style="font-size: 15px; font-weight: bold; color: #e6a23c;">{{ user.duplicateCount ?? '-' }}</div>
           </div>
           <div>
             <div style="font-size: 12px; color: #909399; margin-bottom: 2px;">重复率</div>
             <div style="font-size: 15px; font-weight: bold; color: #f56c6c;">
-              {{ user.commentCount > 0 ? ((user.duplicateCount / user.commentCount) * 100).toFixed(1) : 0 }}%
+              {{ user.commentCount > 0 && user.duplicateCount != null ? ((user.duplicateCount / user.commentCount) * 100).toFixed(1) : '-' }}%
             </div>
           </div>
           <div>
